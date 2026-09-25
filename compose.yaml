@@ -1,0 +1,66 @@
+services:
+  db:
+    image: postgres:16
+
+    env_file:
+      - .env
+
+    environment:
+      POSTGRES_PASSOWRD_FILE: /run/secrets/db-password
+
+    secrets:
+      - db-password
+
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+    networks:
+      - backend
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./app
+
+    env_file:
+      - .env
+
+    environment:
+      DB_HOST: db
+
+    secrets:
+      - source: db-password
+        target: spring.datasource.password
+
+    ports:
+      - "127.0.0.1:8080:8080"
+
+    networks:
+      - backend
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/actuator/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  db-data:
+    name: url-shortener-db-data
+
+networks:
+  backend:
+
+secrets:
+  db-password:
+    file: ./secrets/db-password.txt
